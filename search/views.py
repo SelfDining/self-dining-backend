@@ -8,22 +8,23 @@ from rest_framework import viewsets, mixins
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 
-from .models import Ingredients
-from .serializers import WordValidationSerializer, IngredientSerializer
+from youtube.models import YouTube
+from .models import Ingredients, Ingredients_Youtube
+from .serializers import GetYouTubeFromIngredientSerializer, WordValidationSerializer
 
 
-class IngredientViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
-    serializer_class = IngredientSerializer
+class GetYouTubeFromIngredientViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    queryset = Ingredients.objects.all()
+    serializer_class = GetYouTubeFromIngredientSerializer
 
     def get_queryset(self):
-        queryset = Ingredients.objects.all()
-
         serializer = WordValidationSerializer(data=self.request.query_params)
         serializer.is_valid(raise_exception=True)
+
         word = serializer.validated_data['word']
 
         if word:
-            queryset = queryset.filter(name__icontains=word).annotate(
+            queryset = self.queryset.filter(name__icontains=word).annotate(
                 starts_with=Case(
                     When(name__istartswith=word, then=0),
                     default=1,
@@ -34,7 +35,9 @@ class IngredientViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     
     @swagger_auto_schema(query_serializer=WordValidationSerializer)
     def list(self, request):
-        queryset = self.get_queryset()
+        queryset = Ingredients_Youtube.objects.filter(
+            ingredients_id__in=self.get_queryset().values('id')).values('youtube_id')
+        queryset = YouTube.objects.filter(id__in=queryset)
         serializer = self.get_serializer(queryset, many=True)
 
         return Response(serializer.data, status=200)
